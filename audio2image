@@ -20,7 +20,7 @@ my %bytes_per_pixel = (
     bmp => 3,
 );
 
-my $format = 'ppm'; # ppm,pgm,bmp
+my $format = 'bmp'; # ppm,pgm,pbm,bmp
 my $width; # px
 my $height; # px
 
@@ -155,8 +155,8 @@ Image options:
         ppm: 24bpp colour
         pgm:  8bpp greyscale
         pbm:  1bpp black and white
-        bmp: ???
-        Default: ppm
+        bmp: 24bpp colour
+        Default: bmp
 
     -w,--width PIXELS
         Set the image width in pixels.
