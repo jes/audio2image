@@ -68,6 +68,7 @@ warn "warning: the specified dimensions truncate the audio stream\n" if !$quiet 
 # 3. write the image file
 $writer{$format}->(@samples);
 
+# https://en.wikipedia.org/wiki/Netpbm
 sub write_netpbm {
     my (@pcm) = @_;
 
@@ -92,12 +93,36 @@ sub write_netpbm {
         $need_samples = $samples_per_row * $height - @pcm;
     }
 
-    print chr(128) for (0..$need_samples);
+    print chr(128) for (1..$need_samples);
 }
 
+# https://en.wikipedia.org/wiki/BMP_file_format
 sub write_bmp {
     my (@pcm) = @_;
-    die "not implemented";
+
+    my $pixel_start_addr = 14;
+    my $bits_per_pixel = 24;
+    my $hori_res = 1; # pixels per metre
+    my $vert_res = 1; # pixels per metre
+
+    my $bytes_per_row = ceil(($width*3)/4)*4;
+    my $bitmap_bytes = $bytes_per_row * $height;
+
+    my $length_bytes = 14 + 40 + $bitmap_bytes;
+
+    # 14-byte bitmap header
+    print "BM";
+    print pack("LSSL", $length_bytes, 0, 0, $pixel_start_addr);
+
+    # 40-byte DIB header (BITMAPINFOHEADER)
+    print pack("LLLSSLLLLLL", 40, $width, $height, 1, $bits_per_pixel, 0, $bitmap_bytes, $hori_res, $vert_res, 0, 0);
+
+    print STDERR "length = $length_bytes\n";
+
+    # bitmap data
+    print chr(int($_)) for @pcm;
+    my $need_samples = $bitmap_bytes - @pcm;
+    print chr(128) for (1..$need_samples);
 }
 
 sub read_audio {
@@ -119,7 +144,7 @@ sub read_audio {
 sub help {
     print qq{usage: audio2image [options] [AUDIOFILE] > [IMAGEFILE]
 
-This program will decode audio from the given audio file (in any format supported by libsndfile)
+This program will decode audio from the given audio file (in any format supported by ffmpeg)
 and write it out as an image file in NetPBM or BMP format, such that it can
 be played using aplay(1).
 
