@@ -1,0 +1,183 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use Getopt::Long;
+use POSIX qw(ceil);
+
+my %writer = (
+    ppm => \&write_netpbm,
+    pgm => \&write_netpbm,
+    pbm => \&write_netpbm,
+    bmp => \&write_bmp,
+);
+
+my %bytes_per_pixel = (
+    ppm => 3,
+    pgm => 1,
+    pbm => 1/8,
+    bmp => 3,
+);
+
+my $format = 'ppm'; # ppm,pgm,bmp
+my $width; # px
+my $height; # px
+
+my $samplerate = 8000; # Hz
+my $channels = 1; # mono or stereo
+
+my $quiet;
+
+GetOptions(
+    'f|format=s' => \$format,
+    'w|width=i' => \$width,
+    'h|height=i' => \$height,
+
+    'r|rate=i' => \$samplerate,
+    'c|channels=i' => \$channels,
+
+    'q|quiet' => \$quiet,
+    'h|help' => sub { help(); },
+    'usage' => sub { help(); },
+) or help();
+
+my $audiofile = shift or help();
+@ARGV == 0 or die "error: excess command line arguments [" . join(' ', @ARGV) . "] (perhaps try --help)\n";
+
+die "error: 0 output channels makes no sense\n" if $channels == 0;
+die "error: format '$format' not recognised\n" if !$writer{$format};
+
+# 1. read in the audio file with ffmpeg
+my @samples = read_audio($audiofile);
+
+# 2. compute the required image dimensions
+my $npixels = ceil(@samples / ($channels * $bytes_per_pixel{$format}));
+if (!$width && !$height) {
+    $width = $height = ceil(sqrt($npixels));
+} elsif (!$width) {
+    die "error: negative height makes no sense\n" if $height < 0;
+    $width = ceil($npixels / $height);
+} elsif (!$height) {
+    die "error: negative width makes no sense\n" if $width < 0;
+    $height = ceil($npixels / $width);
+}
+
+warn "warning: the specified dimensions truncate the audio stream\n" if !$quiet && ($width*$height < $npixels);
+
+# 3. write the image file
+$writer{$format}->(@samples);
+
+sub write_netpbm {
+    my (@pcm) = @_;
+
+    my %p = (
+        ppm => 6,
+        pgm => 5,
+        pbm => 4,
+    );
+    my %maxval = (
+        ppm => 255,
+        pgm => 255,
+        pbm => '',
+    );
+
+    print "P$p{$format} $width $height $maxval{$format}\n";
+    print chr(int($_)) for @pcm;
+    my $need_samples = ceil($width*$height*$bytes_per_pixel{$format})-@pcm;
+
+    if ($format eq 'pbm') {
+        # for pbm we need to pack each row to byte boundary
+        my $samples_per_row = ceil($width / 8);
+        $need_samples = $samples_per_row * $height - @pcm;
+    }
+
+    print chr(128) for (0..$need_samples);
+}
+
+sub write_bmp {
+    my (@pcm) = @_;
+    die "not implemented";
+}
+
+sub read_audio {
+    my ($file) = @_;
+
+    my @pcm;
+
+    open(my $fh, "ffmpeg -loglevel error -i \Q$file\E -ar \Q$samplerate\E -ac \Q$channels\E -acodec pcm_u8 -f u8 - |")
+        or die "error: can't read from ffmpeg: $!\n";
+    my $buf = '';
+    while (read($fh, $buf, 256)) {
+        push @pcm, map { ord($_) } split //, $buf;
+    }
+    close $fh;
+
+    return @pcm;
+}
+
+sub help {
+    print qq{usage: audio2image [options] [AUDIOFILE] > [IMAGEFILE]
+
+This program will decode audio from the given audio file (in any format supported by libsndfile)
+and write it out as an image file in NetPBM or BMP format, such that it can
+be played using aplay(1).
+
+Image options:
+
+    -f,--format ppm|pgm|pbm|bmp
+        Set the output image format.
+        ppm: 24bpp colour
+        pgm:  8bpp greyscale
+        pbm:  1bpp black and white
+        bmp: ???
+        Default: ppm
+
+    -w,--width PIXELS
+        Set the image width in pixels.
+        If height is set but not width, then width will be calculated as:
+            ceil(total_pixels / height)
+        If neither height nor width are set, then both will be calculated as:
+            ceil(sqrt(total_pixels))
+
+    -h,--height PIXELS
+        Set the image height in pixels.
+        If width is set but not height, then height will be calculated as:
+            ceil(total_pixels / width)
+        If neither height nor width are set, then both will be calculated as:
+            ceil(sqrt(total_pixels))
+
+Audio options:
+
+    -r,--rate HZ
+        Set the output sample rate in Hz. If necessary, the input audio will be
+        resampled to match this. The resampling is quite primitive, for better
+        results use better software.
+        Default: 8000
+
+    -c,--channels CHANNELS
+        Set the number of output channels. Use 2 for stereo output. If necessary, the
+        input channels will be combined or duplicated to match this.
+        Default: 1
+
+Other options:
+
+    -q,--quiet
+        Don't warn if the specified width/height truncate the audio.
+        Default: off
+
+    -h,--help,--usage
+        Show this text.
+
+Input is taken from a single filename specified on the command line.
+Output is given on stdout.
+
+Examples:
+
+    \$ audio2image -r 44100 -c 2 -w 800 -h 600 -f bmp example.wav > example.bmp
+
+audio2image is a program by James Stanley. You can email me at james\@incoherency.co.uk or read my blog at https://incoherency.co.uk/
+};
+
+    exit 0;
+}
