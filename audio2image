@@ -117,8 +117,6 @@ sub write_bmp {
     # 40-byte DIB header (BITMAPINFOHEADER)
     print pack("LLLSSLLLLLL", 40, $width, $height, 1, $bits_per_pixel, 0, $bitmap_bytes, $hori_res, $vert_res, 0, 0);
 
-    print STDERR "length = $length_bytes\n";
-
     # bitmap data
     print chr(int($_)) for @pcm;
     my $need_samples = $bitmap_bytes - @pcm;
