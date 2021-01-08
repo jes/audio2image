@@ -1,0 +1,73 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use Getopt::Long;
+
+my $samplerate = 8000; # Hz
+my $channels = 1; # mono or stereo
+
+GetOptions(
+    'r|rate=i' => \$samplerate,
+    'c|channels=i' => \$channels,
+
+    'help' => sub { help(); },
+    'usage' => sub { help(); },
+) or help(1);
+
+my $c = join('', <>);
+
+# TODO: parse image header and skip header bytes
+
+# http://soundfile.sapp.org/doc/WaveFormat/
+my $subchunk1size = 16;
+my $subchunk2size = length($c);
+my $chunksize = 4 + (8 + $subchunk1size) + (8 + $subchunk2size);
+
+# RIFF header
+print "RIFF";
+print pack("L", $chunksize);
+print "WAVE";
+
+# fmt subchunk
+print "fmt ";
+print pack("LSSLLSS", $subchunk1size, 1, $channels, $samplerate, $samplerate*$channels, $channels, 8);
+
+# data subchunk
+print "data";
+print pack("L", $subchunk2size);
+print $c;
+
+sub help {
+    my ($rc) = @_;
+    print qq{usage: image2audio [options] IMAGEFILE > AUDIOFILE
+
+This program will read raw bytes from the given image file and write it out
+with a WAV file header.
+
+Options:
+
+    -r,--rate HZ
+        Set the output sample rate in Hz.
+        Default: 8000
+
+    -c,--channels CHANNELS
+        Set the number of output channels. Use 2 for stereo output.
+        Default: 1
+
+    --help,--usage
+        Show this text.
+
+Input is taken from a filename specified on the command line or from stdin.
+Output is given on stdout.
+
+Example:
+
+    \$ image2audio -r 44100 -c 2 example.bmp > example.wav
+
+image2audio is a program by James Stanley. You can email me at james\@incoherency.co.uk or read my blog at https://incoherency.co.uk/
+};
+
+    exit $rc||0;
+}
