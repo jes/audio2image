@@ -203,5 +203,5 @@ Example:
 audio2image is a program by James Stanley. You can email me at james\@incoherency.co.uk or read my blog at https://incoherency.co.uk/
 };
 
-    exit $rc||0;
+    exit ($rc||0);
 }

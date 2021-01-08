@@ -18,7 +18,13 @@ GetOptions(
 
 my $c = join('', <>);
 
-# TODO: parse image header and skip header bytes
+# delete BMP header
+if ($c =~ /^BM/) {
+    my $addr = unpack("L", substr($c, 10, 4));
+    $c = substr($c, $addr);
+} else {
+    # TODO: delete NetPBM headers
+}
 
 # http://soundfile.sapp.org/doc/WaveFormat/
 my $subchunk1size = 16;
@@ -69,5 +75,5 @@ Example:
 image2audio is a program by James Stanley. You can email me at james\@incoherency.co.uk or read my blog at https://incoherency.co.uk/
 };
 
-    exit $rc||0;
+    exit ($rc||0);
 }
