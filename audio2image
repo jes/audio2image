@@ -38,9 +38,9 @@ GetOptions(
     'c|channels=i' => \$channels,
 
     'q|quiet' => \$quiet,
-    'h|help' => sub { help(); },
+    'help' => sub { help(); },
     'usage' => sub { help(); },
-) or help();
+) or help(1);
 
 my $audiofile = shift or help();
 @ARGV == 0 or die "error: excess command line arguments [" . join(' ', @ARGV) . "] (perhaps try --help)\n";
@@ -100,7 +100,7 @@ sub write_netpbm {
 sub write_bmp {
     my (@pcm) = @_;
 
-    my $pixel_start_addr = 14;
+    my $pixel_start_addr = 14 + 40;
     my $bits_per_pixel = 24;
     my $hori_res = 1; # pixels per metre
     my $vert_res = 1; # pixels per metre
@@ -140,7 +140,8 @@ sub read_audio {
 }
 
 sub help {
-    print qq{usage: audio2image [options] [AUDIOFILE] > [IMAGEFILE]
+    my ($rc) = @_;
+    print qq{usage: audio2image [options] AUDIOFILE > IMAGEFILE
 
 This program will decode audio from the given audio file (in any format supported by ffmpeg)
 and write it out as an image file in NetPBM or BMP format, such that it can
@@ -189,18 +190,18 @@ Other options:
         Don't warn if the specified width/height truncate the audio.
         Default: off
 
-    -h,--help,--usage
+    --help,--usage
         Show this text.
 
 Input is taken from a single filename specified on the command line.
 Output is given on stdout.
 
-Examples:
+Example:
 
     \$ audio2image -r 44100 -c 2 -w 800 -h 600 -f bmp example.wav > example.bmp
 
 audio2image is a program by James Stanley. You can email me at james\@incoherency.co.uk or read my blog at https://incoherency.co.uk/
 };
 
-    exit 0;
+    exit $rc||0;
 }
